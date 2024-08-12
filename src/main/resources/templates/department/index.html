@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link href="../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/plugins/datatables/jquery.dataTables.min.css">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <table class="table table-bordered" id="myTable">
+            <button class="btn-danger mb-2 mt-2" data-toggle="modal" data-target="#responsive-modal">Create New</button>
+            <thead>
+                <tr>
+                    <td>Department ID</td>
+                    <td>Department Name</td>
+                    <td>Region Name</td>
+                    <td>Action</td>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- <tr th:each="department: ${departments}">
+                    <td th:text="${department.id}"></td>
+                    <td th:text="${department.name}"></td>
+                    <td th:text="${department.region.name}"></td>  
+                </tr> -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- sample modal content -->
+    <div id="responsive-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel"
+        aria-hidden="true" style="display: none;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                    <h4 class="modal-title">Department</h4>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div hidden class="form-group">
+                            <label for="department-id" class="control-label">ID:</label>
+                            <input type="text" class="form-control" id="department-id" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="input-department-name" class="control-label">Department Name:</label>
+                            <input type="text" class="form-control" id="input-department-name">
+                        </div>
+                        <div class="form-group">
+                            <label for="input-region" class="control-label">Region Name:</label>
+                            <select class="form-control" id="input-region"></select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default waves-effect" data-dismiss="modal">Close</button>
+                    <button id="submit-data" type="button" class="btn btn-danger waves-effect waves-light"
+                        onclick="create()">Save changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../assets/plugins/jquery/jquery.min.js"></script>
+    <script src="../assets/plugins/bootstrap/js/popper.min.js"></script>
+    <script src="../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../assets/plugins/datatables/jquery.dataTables.min.js"></script>
+    <script>
+        $(document).ready(() => {
+            $("#myTable").DataTable({
+                "ajax": {
+                    url: "/department/api/departments",
+                    type: "GET",
+                    headers: {
+                        "x-token": "test"
+                    },
+                    dataSrc: "data"
+                },
+                "columnDefs": [
+                    {
+                        "targets": [0],
+                        "visible": false,
+                        "searchable": false
+                    },
+                    {
+                        "targets": [3],
+                        "searchable": false,
+                        "orderable": false
+                    }
+                ],
+                "columns": [
+                    {
+                        "data": "id"
+                    },
+                    {
+                        "data": "name"
+                    },
+                    {
+                        "data": "region.name"
+                    },
+                    {
+                        "render": (data, type, full, meta) => {
+                            let html = "";
+                            html += `<a data-toggle="modal" data-target="#responsive-modal" onclick="edit('${full.id}', '${full.name}', '${full.region.id}')"><i class="fa fa-pencil"></i> Edit</a> | <a onclick="remove(${full.id})"><i class="fa fa-trash-o"></i> Remove</a>`
+                            return html;
+                        }
+                    }
+                ]
+            });
+
+            $('#responsive-modal').on('hide.bs.modal', function () {
+                $('#department-id').val('');
+                $('#input-department-name').val('');
+                $('#input-region').val('');
+            });
+
+            $('#responsive-modal').on('show.bs.modal', function () {
+                fetchRegionData();
+            });
+
+            function fetchRegionData() {
+                $.ajax({
+                    url: "/api/regions",
+                    type: "GET",
+                    headers: {
+                        "x-token": "test"
+                    },
+                    dataSrc: "data",
+                    success: function (regions) {
+                        console.log(regions.data);
+                        let arrRegions = regions.data;
+                        let regionSelect = $('#input-region');
+                        regionSelect.empty();
+                        regionSelect.append('<option value="" selected="true" disabled="true">Select a Region</option>');
+                        arrRegions.forEach(region => {
+                            regionSelect.append(`<option value="${region.id}">${region.name}</option>`);
+                        });
+                    },
+                    error: function (error) {
+                        console.log(error);
+                    }
+                });
+            };
+        })
+
+        function create() {
+            let newDepartment = {  //DepartmentDto
+                id: $('#department-id').val(),
+                name: $('#input-department-name').val(),
+                regionId: $('#input-region').val()
+            };
+            console.log(newDepartment);
+            $.ajax({
+                url: "/department/api/save",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(newDepartment),
+            }).done((response) => {
+                console.log(response);
+                $("#myTable").DataTable().ajax.reload();
+                $('#responsive-modal').modal('hide');
+            }).fail((error) => {
+                console.log(error);
+            });
+        }
+
+
+        function edit(departmentId, departmentName, regionId) {
+            console.log("Edit was clicked " + departmentId);
+            $('#department-id').val(departmentId);
+            $('#input-department-name').val(departmentName);
+            $('#input-region').val(regionId);
+            $('#submit-data').attr('onclick', `create()`);
+        }
+
+        function remove(departmentId) {
+            console.log("Remove was clicked" + departmentId);
+            $.ajax({
+                url: ("/department/api/delete/" + departmentId),
+                type: "DELETE",
+            }).done((response) => {
+                console.log(response)
+                $("#myTable").DataTable().ajax.reload()
+            }).fail((error) => {
+                console.log(error)
+            })
+        }
+
+    </script>
+</body>
+
+</html>
